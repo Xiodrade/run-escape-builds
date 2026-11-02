@@ -111,6 +111,16 @@ export type Content = {
     shop: ShopUpgrade[];
 };
 
+// Everything's number in a short link, by kind; lists only ever grow
+export type LinkIds = {
+    characters: string[];
+    weapons: string[];
+    passives: string[];
+    gear: string[];
+    rarities: string[];
+    versions: string[];
+};
+
 // Lookups by id, made once
 export class Game {
     readonly character = new Map<string, Character>();
@@ -119,7 +129,11 @@ export class Game {
     readonly gear = new Map<string, Gear>();
     readonly set = new Map<string, GearSet>();
 
-    constructor(readonly content: Content) {
+    // Short links' numbers (public/data/link-ids.json), when loaded
+    constructor(
+        readonly content: Content,
+        readonly linkIds?: LinkIds,
+    ) {
         for (const c of content.characters) this.character.set(c.id, c);
         for (const w of content.weapons) this.weapon.set(w.id, w);
         for (const p of content.passives) this.passive.set(p.id, p);
@@ -129,11 +143,14 @@ export class Game {
 }
 
 export async function loadContent(): Promise<Game> {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/content.json`);
-    if (!response.ok) {
+    const [response, ids] = await Promise.all([
+        fetch(`${import.meta.env.BASE_URL}data/content.json`),
+        fetch(`${import.meta.env.BASE_URL}data/link-ids.json`),
+    ]);
+    if (!response.ok || !ids.ok) {
         throw new Error(`Couldn't load the game's content (${response.status})`);
     }
-    return new Game((await response.json()) as Content);
+    return new Game((await response.json()) as Content, (await ids.json()) as LinkIds);
 }
 
 export function iconUrl(objId: number): string {

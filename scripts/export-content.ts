@@ -154,3 +154,6 @@ console.log(
         `${content.weapons.length} weapons, ${content.passives.length} passives, ` +
         `${content.gear.length} gear, ${content.sets.length} sets -> ${OUT}`,
 );
+
+// Number anything new for short links
+await import("./link-ids");

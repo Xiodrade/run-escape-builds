@@ -19,6 +19,10 @@ everything else is the game's content, snapshotted into `public/`.
   `Sim.updateStats` adds them up), set bonuses, evolutions and hilts, and the link format.
   `scripts/verify-totals.ts` checks the totals against the game's own `Sim` for hundreds of random
   builds.
+- `public/data/link-ids.json` numbers every adventurer, weapon, passive, gear piece, rarity and
+  game version, so a link can hold a build in a few bytes. The lists only ever grow: new things go
+  on the end, and nothing is renumbered or removed, or old links would open the wrong items. Never
+  edit or reorder it by hand; `npm run export` appends to it.
 
 ## Working on it
 
@@ -35,7 +39,7 @@ With the game checked out next to this repository (`../Run-Escape`, or set `GAME
 release, with its cache downloaded (`npm run download-caches` there):
 
 ```sh
-npm run export     # public/data/content.json from the game
+npm run export     # public/data/content.json from the game, and new link numbers
 npm run icons      # any new icons into public/icons/
 npm run verify     # the site's totals still match the game's
 npm test

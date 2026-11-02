@@ -10,7 +10,8 @@
         "test": "vitest run",
         "export": "tsx scripts/export-content.ts",
         "icons": "tsx scripts/export-icons.ts",
-        "verify": "tsx scripts/verify-totals.ts"
+        "verify": "tsx scripts/verify-totals.ts",
+        "link-ids": "tsx scripts/link-ids.ts"
     },
     "dependencies": {
         "html-to-image": "^1.11.11",

@@ -11,9 +11,12 @@ import {
     weaponChoices,
     weaponNext,
 } from "./build";
-import { Content, Game } from "./content";
+import { Content, Game, LinkIds } from "./content";
 
-const game = new Game(JSON.parse(readFileSync("public/data/content.json", "utf8")) as Content);
+const game = new Game(
+    JSON.parse(readFileSync("public/data/content.json", "utf8")) as Content,
+    JSON.parse(readFileSync("public/data/link-ids.json", "utf8")) as LinkIds,
+);
 const melee = game.content.characters.find((c) => c.style === "melee")!;
 const magic = game.content.characters.find((c) => c.style === "magic")!;
 
@@ -27,7 +30,7 @@ describe("links", () => {
         build.quality = "rare";
         build.title = "Spin to win: ünïcode";
         build.notes = "Line one\nLine two";
-        expect(decodeBuild(game, encodeBuild(build))).toEqual(build);
+        expect(decodeBuild(game, encodeBuild(game, build))).toEqual(build);
     });
 
     it("leave out what the game doesn't have or allow", () => {
@@ -38,16 +41,52 @@ describe("links", () => {
             head: "not_gear",
             cape: game.content.gear.find((g) => g.slot === "head")!.id,
         };
-        const back = decodeBuild(game, encodeBuild(build))!;
+        const back = decodeBuild(game, encodeBuild(game, build))!;
         expect(back.weapons).toEqual([{ id: melee.startingWeapon, level: 1 }]);
         expect(back.passives[0].level).toBe(game.content.passives[0].maxLevel);
         expect(back.gear).toEqual({});
+    });
+
+    it("are short", () => {
+        const build = newBuild(game, melee.id);
+        build.passives = game.content.passives.slice(0, 4).map((p) => ({ id: p.id, level: 5 }));
+        for (const slot of game.content.gearSlots) {
+            const item = game.content.gear.find((g) => g.slot === slot.id);
+            if (item) build.gear[slot.id] = item.id;
+        }
+        build.title = "Test build";
+        expect(encodeBuild(game, build).length).toBeLessThan(80);
+    });
+
+    it("still open the long links shared before short ones", () => {
+        const head = game.content.gear.find((g) => g.slot === "head")!;
+        const old = btoa(
+            JSON.stringify([
+                1,
+                game.content.gameVersion,
+                melee.id,
+                `${melee.startingWeapon}.3`,
+                "",
+                `head.${head.id}`,
+                "1rare",
+                "Old link",
+                "",
+            ]),
+        );
+        const back = decodeBuild(game, old)!;
+        expect(back.weapons).toEqual([{ id: melee.startingWeapon, level: 3 }]);
+        expect(back.gear).toEqual({ head: head.id });
+        expect(back.shop).toBe(true);
+        expect(back.quality).toBe("rare");
+        expect(back.title).toBe("Old link");
     });
 
     it("turn down a link that isn't a build", () => {
         expect(decodeBuild(game, "")).toBeUndefined();
         expect(decodeBuild(game, "!!!")).toBeUndefined();
         expect(decodeBuild(game, btoa(JSON.stringify([2, "x"])))).toBeUndefined();
+        expect(decodeBuild(game, "Ag")).toBeUndefined();
+        expect(decodeBuild(game, "AgAAAA")).toBeUndefined();
     });
 });
 

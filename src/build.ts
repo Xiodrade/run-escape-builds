@@ -1,7 +1,7 @@
 // A build: an adventurer, the weapons and passives they're aiming for, and the
 // gear they'd wear. Everything here works the way Run Escape does (see the
 // files named in each comment), so the totals are what the game would have.
-import { Game, GearSet, Passive, Rarity, StatMap, Weapon } from "./content";
+import { Game, GearSet, LinkIds, Passive, Rarity, StatMap, Weapon } from "./content";
 
 export type Slotted = { id: string; level: number };
 
@@ -236,9 +236,74 @@ export function formatValue(unit: "percent" | "flat", value: number): string {
 }
 
 // ---- Links ----
+//
+// A link holds the whole build, so it needs no server. Short links (format 2)
+// are a few bytes: things by their number in public/data/link-ids.json, levels
+// as bytes, then the title and notes as text. Format 1 links (base64 JSON with
+// names spelled out) still open.
 
-// A build in a link: compact JSON, base64url. Version 1.
-export function encodeBuild(build: Build): string {
+function toBase64Url(bytes: Uint8Array): string {
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(code: string): Uint8Array {
+    const binary = atob(code.replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+export function encodeBuild(game: Game, build: Build): string {
+    const ids = game.linkIds;
+    const number = (kind: keyof LinkIds, id: string) => ids?.[kind].indexOf(id) ?? -1;
+    const gear = Object.values(build.gear);
+    const numbers = [
+        number("versions", build.game),
+        number("characters", build.character),
+        number("rarities", build.quality),
+        ...build.weapons.map((w) => number("weapons", w.id)),
+        ...build.passives.map((p) => number("passives", p.id)),
+        ...gear.map((g) => number("gear", g)),
+    ];
+    if (
+        !ids ||
+        numbers.some((n) => n < 0) ||
+        number("rarities", build.quality) > 7 ||
+        build.weapons.length > 15 ||
+        build.passives.length > 15
+    ) {
+        return encodeV1(build);
+    }
+
+    const out: number[] = [2];
+    const varint = (n: number) => {
+        while (n >= 0x80) {
+            out.push((n & 0x7f) | 0x80);
+            n >>>= 7;
+        }
+        out.push(n);
+    };
+    varint(number("versions", build.game));
+    varint(number("characters", build.character));
+    out.push((build.shop ? 1 : 0) | (number("rarities", build.quality) << 1));
+    out.push((build.weapons.length << 4) | build.passives.length);
+    for (const w of build.weapons) {
+        varint(number("weapons", w.id));
+        out.push(Math.min(Math.max(w.level, 0), 255));
+    }
+    for (const p of build.passives) {
+        varint(number("passives", p.id));
+        out.push(Math.min(Math.max(p.level, 0), 255));
+    }
+    varint(gear.length);
+    for (const g of gear) varint(number("gear", g));
+    const title = new TextEncoder().encode(build.title);
+    varint(title.length);
+    out.push(...title, ...new TextEncoder().encode(build.notes));
+    return toBase64Url(Uint8Array.from(out));
+}
+
+function encodeV1(build: Build): string {
     const packed = [
         1,
         build.game,
@@ -252,19 +317,79 @@ export function encodeBuild(build: Build): string {
         build.title,
         build.notes,
     ];
-    const bytes = new TextEncoder().encode(JSON.stringify(packed));
-    let binary = "";
-    for (const b of bytes) binary += String.fromCharCode(b);
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return toBase64Url(new TextEncoder().encode(JSON.stringify(packed)));
 }
 
-// A build from a link, with anything the game doesn't have (or doesn't allow)
-// left out, or undefined for a link that isn't one
-export function decodeBuild(game: Game, code: string): Build | undefined {
+// What a link says, before it's checked against the game
+type Unchecked = {
+    game: string;
+    character: string;
+    weapons: Slotted[];
+    passives: Slotted[];
+    // Format 1 also names the slot each piece is worn in
+    gear: { slot?: string; id: string }[];
+    shop: boolean;
+    quality: string;
+    title: string;
+    notes: string;
+};
+
+function readV2(game: Game, bytes: Uint8Array): Unchecked | undefined {
+    const ids = game.linkIds;
+    if (!ids) return undefined;
+    let at = 1;
+    const byte = () => {
+        if (at >= bytes.length) throw new Error("too short");
+        return bytes[at++];
+    };
+    const varint = () => {
+        let n = 0;
+        for (let shift = 0; shift < 28; shift += 7) {
+            const b = byte();
+            n |= (b & 0x7f) << shift;
+            if (b < 0x80) return n;
+        }
+        throw new Error("too long");
+    };
+    const name = (kind: keyof LinkIds) => ids[kind][varint()] ?? "";
+    try {
+        const version = name("versions");
+        const character = name("characters");
+        const flags = byte();
+        const counts = byte();
+        const weapons: Slotted[] = [];
+        for (let i = 0; i < counts >> 4; i++) {
+            weapons.push({ id: name("weapons"), level: byte() });
+        }
+        const passives: Slotted[] = [];
+        for (let i = 0; i < (counts & 15); i++) {
+            passives.push({ id: name("passives"), level: byte() });
+        }
+        const gear: { id: string }[] = [];
+        for (let i = varint(); i > 0; i--) {
+            gear.push({ id: name("gear") });
+        }
+        const titleLength = varint();
+        const text = new TextDecoder();
+        return {
+            game: version,
+            character,
+            weapons,
+            passives,
+            gear,
+            shop: (flags & 1) === 1,
+            quality: ids.rarities[(flags >> 1) & 7] ?? "",
+            title: text.decode(bytes.subarray(at, at + titleLength)),
+            notes: text.decode(bytes.subarray(at + titleLength)),
+        };
+    } catch {
+        return undefined;
+    }
+}
+
+function readV1(bytes: Uint8Array): Unchecked | undefined {
     let packed: unknown;
     try {
-        const binary = atob(code.replace(/-/g, "+").replace(/_/g, "/"));
-        const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
         packed = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
         return undefined;
@@ -272,20 +397,9 @@ export function decodeBuild(game: Game, code: string): Build | undefined {
     if (!Array.isArray(packed) || packed[0] !== 1) {
         return undefined;
     }
-    const [, gameVersion, characterId, weapons, passives, gear, flags, title, notes] = packed.map(
-        (part) => (typeof part === "string" ? part : String(part ?? "")),
+    const [, game, character, weapons, passives, gear, flags, title, notes] = packed.map((part) =>
+        typeof part === "string" ? part : String(part ?? ""),
     );
-    if (!game.character.has(characterId)) {
-        return undefined;
-    }
-    const build = newBuild(game, characterId);
-    build.game = gameVersion.slice(0, 20) || game.content.gameVersion;
-    build.shop = flags.startsWith("1");
-    const quality = flags.slice(1) as Rarity;
-    build.quality = quality in game.content.rarities ? quality : "common";
-    build.title = title.slice(0, TITLE_MAX);
-    build.notes = notes.slice(0, NOTES_MAX);
-
     const slotted = (list: string) =>
         list
             .split(",")
@@ -294,9 +408,47 @@ export function decodeBuild(game: Game, code: string): Build | undefined {
                 const dot = part.lastIndexOf(".");
                 return { id: part.slice(0, dot), level: parseInt(part.slice(dot + 1)) || 1 };
             });
+    return {
+        game,
+        character,
+        weapons: slotted(weapons),
+        passives: slotted(passives),
+        gear: gear
+            .split(",")
+            .filter(Boolean)
+            .map((part) => {
+                const dot = part.indexOf(".");
+                return { slot: part.slice(0, dot), id: part.slice(dot + 1) };
+            }),
+        shop: flags.startsWith("1"),
+        quality: flags.slice(1),
+        title,
+        notes,
+    };
+}
+
+// A build from a link, with anything the game doesn't have (or doesn't allow)
+// left out, or undefined for a link that isn't one
+export function decodeBuild(game: Game, code: string): Build | undefined {
+    let bytes: Uint8Array;
+    try {
+        bytes = fromBase64Url(code);
+    } catch {
+        return undefined;
+    }
+    const read = bytes[0] === 2 ? readV2(game, bytes) : readV1(bytes);
+    if (!read || !game.character.has(read.character)) {
+        return undefined;
+    }
+    const build = newBuild(game, read.character);
+    build.game = read.game.slice(0, 20) || game.content.gameVersion;
+    build.shop = read.shop;
+    build.quality = read.quality in game.content.rarities ? (read.quality as Rarity) : "common";
+    build.title = read.title.slice(0, TITLE_MAX);
+    build.notes = read.notes.slice(0, NOTES_MAX);
 
     build.weapons = [];
-    for (const { id, level } of slotted(weapons)) {
+    for (const { id, level } of read.weapons) {
         const weapon = game.weapon.get(id);
         if (
             weapon &&
@@ -306,7 +458,7 @@ export function decodeBuild(game: Game, code: string): Build | undefined {
             build.weapons.push({ id, level: Math.min(Math.max(level, 1), weapon.levels.length) });
         }
     }
-    for (const { id, level } of slotted(passives)) {
+    for (const { id, level } of read.passives) {
         const passive = game.passive.get(id);
         if (
             passive &&
@@ -316,12 +468,10 @@ export function decodeBuild(game: Game, code: string): Build | undefined {
             build.passives.push({ id, level: Math.min(Math.max(level, 1), passive.maxLevel) });
         }
     }
-    for (const part of gear.split(",").filter(Boolean)) {
-        const dot = part.indexOf(".");
-        const slot = part.slice(0, dot);
-        const item = game.gear.get(part.slice(dot + 1));
-        if (item && item.slot === slot) {
-            build.gear[slot] = item.id;
+    for (const { slot, id } of read.gear) {
+        const item = game.gear.get(id);
+        if (item && (slot === undefined || item.slot === slot)) {
+            build.gear[item.slot] = item.id;
         }
     }
     return build;

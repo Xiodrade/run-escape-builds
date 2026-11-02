@@ -38,9 +38,9 @@ function readHash(game: Game): { build?: Build; editing: boolean } {
     return { build, editing: !build || params.has("edit") };
 }
 
-function shareUrl(build: Build): string {
+function shareUrl(game: Game, build: Build): string {
     const url = new URL(window.location.href);
-    url.hash = `b=${encodeBuild(build)}`;
+    url.hash = `b=${encodeBuild(game, build)}`;
     return url.toString();
 }
 
@@ -77,7 +77,7 @@ function Builder({ game }: { game: Game }) {
         window.history.replaceState(
             null,
             "",
-            `#b=${encodeBuild(build)}${editing ? "&edit" : ""}`,
+            `#b=${encodeBuild(game, build)}${editing ? "&edit" : ""}`,
         );
     }, [build, editing]);
 
@@ -243,7 +243,7 @@ function Builder({ game }: { game: Game }) {
 
     const copyLink = async () => {
         try {
-            await navigator.clipboard.writeText(shareUrl(build));
+            await navigator.clipboard.writeText(shareUrl(game, build));
             say("Link copied");
         } catch {
             say("Couldn't copy the link");
