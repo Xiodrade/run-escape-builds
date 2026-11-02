@@ -29,9 +29,19 @@ const GAME_URL = "https://github.com/Dynrothe/Run-Escape";
 type Picking =
     { kind: "weapon"; replace?: string } | { kind: "passive" } | { kind: "gear"; slot: string };
 
-function buildFromHash(game: Game): Build | undefined {
-    const code = new URLSearchParams(window.location.hash.slice(1)).get("b");
-    return code ? decodeBuild(game, code) : undefined;
+// A shared link (#b=...) opens the build to look at; the builder keeps its
+// build in the address too, marked &edit, so a refresh doesn't lose it
+function readHash(game: Game): { build?: Build; editing: boolean } {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const code = params.get("b");
+    const build = code ? decodeBuild(game, code) : undefined;
+    return { build, editing: !build || params.has("edit") };
+}
+
+function shareUrl(build: Build): string {
+    const url = new URL(window.location.href);
+    url.hash = `b=${encodeBuild(build)}`;
+    return url.toString();
 }
 
 export function App() {
@@ -52,23 +62,32 @@ export function App() {
 }
 
 function Builder({ game }: { game: Game }) {
+    const [start] = useState(() => readHash(game));
     const [build, setBuild] = useState<Build>(
-        () => buildFromHash(game) ?? newBuild(game, game.content.characters[0].id),
+        () => start.build ?? newBuild(game, game.content.characters[0].id),
     );
+    const [editing, setEditing] = useState(start.editing);
     const [picking, setPicking] = useState<Picking>();
     const [styleFilter, setStyleFilter] = useState<Style | "all">("all");
     const [status, setStatus] = useState("");
     const card = useRef<HTMLDivElement>(null);
 
-    // The build is always in the address, so the page's link is the build
+    // The build is always in the address, so a refresh keeps it
     useEffect(() => {
-        window.history.replaceState(null, "", `#b=${encodeBuild(build)}`);
-    }, [build]);
+        window.history.replaceState(
+            null,
+            "",
+            `#b=${encodeBuild(build)}${editing ? "&edit" : ""}`,
+        );
+    }, [build, editing]);
 
     useEffect(() => {
         const onHash = () => {
-            const fromLink = buildFromHash(game);
-            if (fromLink) setBuild(fromLink);
+            const fromLink = readHash(game);
+            if (fromLink.build) {
+                setBuild(fromLink.build);
+                setEditing(fromLink.editing);
+            }
         };
         window.addEventListener("hashchange", onHash);
         return () => window.removeEventListener("hashchange", onHash);
@@ -224,12 +243,60 @@ function Builder({ game }: { game: Game }) {
 
     const copyLink = async () => {
         try {
-            await navigator.clipboard.writeText(window.location.href);
+            await navigator.clipboard.writeText(shareUrl(build));
             say("Link copied");
         } catch {
-            say("Copy the address bar to share");
+            say("Couldn't copy the link");
         }
     };
+
+    const imageButton = (
+        <button className="button go" onClick={saveImage}>
+            Save image
+        </button>
+    );
+    const statusLine = (
+        <span className="status" role="status">
+            {status}
+        </span>
+    );
+
+    if (!editing) {
+        return (
+            <div className="page">
+                <header className="top">
+                    <h1>Run Escape Builds</h1>
+                    <span className="muted">
+                        A build for <a href={GAME_URL}>Run Escape</a>. A fan site, not part of the
+                        game.
+                    </span>
+                </header>
+                <main className="shared">
+                    <div className="toolbar">
+                        {imageButton}
+                        <button className="button" onClick={() => setEditing(true)}>
+                            Edit a copy
+                        </button>
+                        <button
+                            className="button"
+                            onClick={() => {
+                                setBuild(newBuild(game, build.character));
+                                setEditing(true);
+                            }}
+                        >
+                            Make your own
+                        </button>
+                        {statusLine}
+                    </div>
+                    <BuildCard ref={card} game={game} build={build} />
+                </main>
+                <footer className="foot muted">
+                    Icons drawn from the Old School RuneScape cache, which belongs to Jagex. Not
+                    affiliated with Jagex or Run Escape. Made by Okaeri.
+                </footer>
+            </div>
+        );
+    }
 
     const characters = game.content.characters.filter(
         (c) => styleFilter === "all" || c.style === styleFilter,
@@ -562,9 +629,7 @@ function Builder({ game }: { game: Game }) {
 
                 <aside className="preview">
                     <div className="toolbar">
-                        <button className="button go" onClick={saveImage}>
-                            Save image
-                        </button>
+                        {imageButton}
                         <button className="button" onClick={copyLink}>
                             Copy link
                         </button>
@@ -574,9 +639,7 @@ function Builder({ game }: { game: Game }) {
                         >
                             Start over
                         </button>
-                        <span className="status" role="status">
-                            {status}
-                        </span>
+                        {statusLine}
                     </div>
                     <BuildCard ref={card} game={game} build={build} />
                 </aside>
