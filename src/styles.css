@@ -1,0 +1,523 @@
+@font-face {
+    font-family: "OSRS Bold";
+    src: url(./RuneScape-Bold-12.ttf);
+}
+@font-face {
+    font-family: "OSRS Plain";
+    src: url(./RuneScape-Plain-12.ttf);
+}
+@font-face {
+    font-family: "OSRS Small";
+    src: url(./RuneScape-Plain-11.ttf);
+}
+
+/* The game's interface: warm stone browns, orange headings, white text */
+:root {
+    --bg: #2b241b;
+    --panel: #3e3529;
+    --panel-raised: #4b4032;
+    --inset: #2f281f;
+    --edge-dark: #191510;
+    --edge-light: #6a5b45;
+    --text: #f2e9d6;
+    --muted: #b8a989;
+    --orange: #ff981f;
+    --yellow: #ffff00;
+    --good: #56e156;
+    --warn: #ff863c;
+    --link: #ffb54a;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "OSRS Plain", sans-serif;
+    font-size: 16px;
+    line-height: 1.25;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+}
+
+a {
+    color: var(--link);
+}
+
+h1,
+h2,
+h3 {
+    font-family: "OSRS Bold", sans-serif;
+    font-weight: normal;
+    color: var(--orange);
+    margin: 0;
+    text-shadow: 1px 1px 0 #000;
+}
+h1 {
+    font-size: 32px;
+}
+h2 {
+    font-size: 20px;
+}
+h3 {
+    font-size: 16px;
+    margin: 12px 0 6px;
+}
+
+.muted {
+    color: var(--muted);
+}
+.warn {
+    color: var(--warn);
+}
+
+.icon {
+    image-rendering: pixelated;
+    flex: none;
+}
+
+.page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+.top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 16px;
+    margin-bottom: 16px;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 420px;
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 980px) {
+    .layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.builder {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.preview {
+    position: sticky;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+@media (max-width: 980px) {
+    .preview {
+        position: static;
+    }
+}
+
+/* A raised stone panel, edged like the game's */
+.panel {
+    background: var(--panel);
+    border: 2px solid var(--edge-dark);
+    box-shadow:
+        inset 1px 1px 0 var(--edge-light),
+        inset -1px -1px 0 #2a231a;
+    padding: 12px;
+}
+
+.section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.about {
+    margin: 10px 0 0;
+    color: var(--muted);
+}
+
+/* Buttons are flat stone: no transitions or movement on hover */
+button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+.button {
+    background: var(--panel-raised);
+    border: 1px solid var(--edge-dark);
+    box-shadow: inset 1px 1px 0 var(--edge-light);
+    padding: 4px 10px;
+    color: var(--text);
+}
+.button:hover:not(:disabled) {
+    background: #574a39;
+}
+.button:disabled {
+    color: #7d705a;
+    cursor: default;
+}
+.button.go {
+    color: var(--good);
+}
+.link-button {
+    background: none;
+    border: none;
+    padding: 0 0 0 8px;
+    color: var(--link);
+    text-decoration: underline;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.chip {
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+    padding: 2px 10px;
+    color: var(--muted);
+}
+.chip.on {
+    color: var(--yellow);
+    background: var(--panel-raised);
+}
+
+/* Adventurers: as many columns as fit */
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 6px;
+}
+.tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+    text-align: center;
+}
+.tile:hover {
+    background: #3a3126;
+}
+.tile.on {
+    border-color: var(--yellow);
+    background: var(--panel-raised);
+}
+.tile-name {
+    color: var(--orange);
+}
+.tile-sub {
+    font-family: "OSRS Small", sans-serif;
+    color: var(--muted);
+}
+
+.slot {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px;
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+    margin-bottom: 6px;
+}
+@media (max-width: 640px) {
+    .slot {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+    .slot .stepper,
+    .slot .slot-actions {
+        grid-column: 2;
+    }
+}
+.slot-name {
+    font-family: "OSRS Bold", sans-serif;
+}
+.slot-lines {
+    color: var(--muted);
+}
+.slot-next {
+    color: var(--text);
+}
+.slot-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.stepper span {
+    min-width: 40px;
+    text-align: center;
+    color: var(--yellow);
+}
+
+.add {
+    width: 100%;
+    padding: 10px;
+    background: var(--inset);
+    border: 1px dashed var(--edge-light);
+    color: var(--muted);
+}
+.add:hover {
+    color: var(--text);
+}
+
+.gear-slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 6px;
+}
+.gear-slot {
+    display: flex;
+    align-items: center;
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+    padding-right: 8px;
+}
+.gear-pick {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    background: none;
+    border: none;
+    text-align: left;
+    min-width: 0;
+}
+.gear-empty {
+    width: 72px;
+    height: 64px;
+    background: #27211a;
+    border: 1px solid var(--edge-dark);
+    flex: none;
+}
+.gear-label {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 10px;
+}
+.field.inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+input,
+textarea,
+select {
+    font: inherit;
+    color: var(--text);
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+    padding: 6px 8px;
+}
+textarea {
+    resize: vertical;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.status {
+    color: var(--good);
+}
+
+/* The card that becomes the image */
+.card {
+    background: var(--panel);
+}
+.card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.card-title {
+    font-size: 24px;
+    color: var(--yellow);
+}
+.card-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.card-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.level {
+    margin-left: auto;
+    color: var(--yellow);
+}
+.card-gear {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 4px;
+}
+.gear-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+}
+.gear-cell.empty {
+    opacity: 0.6;
+}
+.gear-slot-name {
+    font-family: "OSRS Small", sans-serif;
+    color: #7d705a;
+    font-size: 12px;
+}
+.card-sets {
+    margin-top: 8px;
+}
+.set {
+    color: var(--muted);
+}
+.set.on {
+    color: var(--good);
+}
+.totals {
+    border-collapse: collapse;
+}
+.totals td {
+    padding: 1px 0;
+    vertical-align: top;
+}
+.total-value {
+    color: var(--yellow);
+    text-align: right;
+    padding-right: 8px !important;
+    white-space: nowrap;
+}
+.card-notes {
+    white-space: pre-wrap;
+    margin: 12px 0 0;
+    padding: 8px;
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+}
+.card-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--edge-dark);
+    font-family: "OSRS Small", sans-serif;
+    color: var(--muted);
+}
+
+/* The picker */
+.backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 16, 11, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 10;
+}
+.picker {
+    width: min(960px, 100%);
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+}
+.picker-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.picker-head h2 {
+    margin-right: auto;
+}
+.search {
+    flex: 1;
+    min-width: 160px;
+}
+.picker-list {
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 6px;
+}
+.option {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    text-align: left;
+    padding: 6px;
+    background: var(--inset);
+    border: 1px solid var(--edge-dark);
+}
+.option:hover:not(:disabled) {
+    background: #3a3126;
+}
+.option:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+.option-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.option-name {
+    font-family: "OSRS Bold", sans-serif;
+}
+.option-line {
+    color: var(--text);
+}
+.option-note {
+    color: var(--muted);
+    font-family: "OSRS Small", sans-serif;
+}
+
+.foot {
+    margin-top: 24px;
+    font-family: "OSRS Small", sans-serif;
+}
