@@ -88,8 +88,18 @@ function Builder({ game }: { game: Game }) {
         if (id === build.character) return;
         const fresh = newBuild(game, id);
         // Keep what still fits: passives and gear are anyone's, weapons only
-        // when this adventurer can find them
+        // when this adventurer can find them. The old adventurer's starting
+        // weapon (and whatever it evolved into) goes; the new one's replaces it.
         update((b) => {
+            const oldStart = new Set<string>();
+            const queue = [game.character.get(b.character)?.startingWeapon];
+            for (let wid = queue.pop(); wid !== undefined; wid = queue.pop()) {
+                if (oldStart.has(wid)) continue;
+                oldStart.add(wid);
+                const w = game.weapon.get(wid);
+                if (w?.evolution) queue.push(w.evolution.into);
+                for (const into of w?.hilts?.into ?? []) queue.push(into);
+            }
             const next = {
                 ...fresh,
                 passives: b.passives,
@@ -104,6 +114,7 @@ function Builder({ game }: { game: Game }) {
                 const weapon = game.weapon.get(slot.id);
                 if (
                     weapon &&
+                    !oldStart.has(slot.id) &&
                     next.weapons.length < maxWeapons(game, next) &&
                     (allowed.has(slot.id) || weapon.evolved || weapon.pickOnly) &&
                     (!weapon.classStyle || weapon.classStyle === game.character.get(id)?.style) &&
